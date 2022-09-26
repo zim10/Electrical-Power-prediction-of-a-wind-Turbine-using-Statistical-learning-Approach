@@ -1,0 +1,1 @@
+# Electrical-Power-prediction-of-a-wind-Turbine-using-Statistical-learning-Approach
