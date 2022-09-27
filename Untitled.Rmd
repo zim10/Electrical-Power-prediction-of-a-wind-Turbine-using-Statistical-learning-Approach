@@ -1,0 +1,1050 @@
+
+---
+title: "Electrical power prediction of a wind turbine using statistical learning approach"
+author: "Azim Khan"
+output:
+  word_document: default
+  html_document: default
+---
+I read the data from a csv file and attach to the project. The R function attach() is use to attach data to the project for ease of accessibility.
+
+```{r}
+
+turbine <- read.csv("/Users/azimkhan22/Documents/r_doc/final_code/turbine_std.csv", na.strings = "?", stringsAsFactors = T)
+attach(turbine)
+```
+Below procedure display the data’s features and observations for better understanding.
+```{r}
+names(turbine) # displays features names
+```
+```{r}
+head(turbine) # displays 10 observations
+```
+```{r}
+dim(turbine)
+```
+The dim()function shows the data has 12000 obervations and 12 columns.
+```{r}
+sum(is.na(turbine)) # no missing value
+```
+
+The summary() function in R shows a numerical summary of each variable in turbine data set. We display the summary statistics of our turbine dataset.
+```{r}
+summary(turbine)
+```
+Next, I examine the correlation state of our data. I display correlation with cor() R function.
+```{r}
+cor(turbine)
+```
+For all variables, there isn’t substantial correlation between the predictors. Also, we use graphical plot to show the correlation state of the data set.
+
+# Graphical Summarires
+First, I use pair() function to create a scatterplot matrix for all the variables. I see a scatterplot for every pair variables in turbine set.
+
+```{r}
+pairs(turbine)
+```
+From the pair plot above, the relationship between predictors and response are not linear.The distribution of response variable (P_avg) using ggplot.
+
+
+```{r}
+library(ggplot2) # Data visualization
+ggplot(turbine,aes(P_avg)) + geom_density(fill='blue')
+```
+The above figure shows the distribuition of response variable (P_avg) closer to normal.
+
+# simple Linear regression
+```{r}
+cor(Ws_avg, P_avg) # correlation between wind speed and power
+```
+The correlation result shows that relationship between single predictor (Ws_avg is average wind speed) in the dataset with output variable (P_avg = power) is higly positive (0.82889).  
+
+* plot Correlation between average wind speed (Ws_avg)  and output power (P_avg)
+```{r}
+ggplot(turbine, aes(x = Ws_avg, y = P_avg)) + 
+  geom_point() + 
+  theme(legend.position = "none") + 
+  scale_x_continuous(labels = scales::comma_format()) + 
+  labs(x = "average wind speed", 
+       y = "power", 
+       title = "Correlation between average wind speed and output power")
+```
+plot shows the relationship is somewhat linea. Let's run the Simple linear regression model.
+```{r}
+#Split the turbine data set (80% as a training data), 20% as a testing data
+index <- sample(nrow(turbine), nrow(turbine) * 0.80)
+turbine.train <- turbine[index, ]
+turbine.test <- turbine[-index, ]
+dim(turbine.train) # check the dimension of the train dataset
+dim(turbine.test) # dimension of the test dataset
+```
+after performing simple linear regression, i am going to answer the follwoing research questions-
+i.Is there a relationship between the wind speed (predictor) and the power (response)?
+ii. How strong is the relationship?
+iii. Is the relationship between the predictor (wind speed) and the response (power) positive or negative?
+iv. What is the predicted power associated with a wind speed of 12? What are the associated 95% confidence and prediction intervals?
+
+```{r}
+set.seed(1)
+library(ISLR)
+attach (turbine.train)
+lm.fit=lm(P_avg~Ws_avg,data=turbine.train)
+summary(lm.fit)
+```
+i. The p-value for the simple linear model  is very small (<<0.05), so there is strong evidence to believe that average wind speed (Ws_avg) is associated with output power (P_avg). Therefore, there is a relationship between the predictor and response.
+
+ii. Residual standard error is 145, that means the 145 amount that the response (power) will deviate from the true regression line. and From the R^2 of the model which is 0.6864 (68%). It explained "the percentage of variability in the response that is explained by the predictor”, here only wind speed (Ws_avg) explains 68% of the variance in target variable (P_avg)
+
+iii. The relationship is positive,as we can see from the parameter estimate by- 
+```{r}
+coefficients(lm.fit)[2]
+```
+It means that, if a wind turbine has higher windspeed, it will generaaly produce higher power.
+
+iv.What is the predicted power associated with a wind speed of 12? What are the associated 95% confidence and prediction intervals?
+
+The confidence interval:
+```{r}
+predict(lm.fit, data.frame(Ws_avg = 12), interval = "confidence", level = 0.95)
+```
+The 95% confidence interval shows that fitted value is 974 and lower interval is 962 and upper interval is 985.
+
+The prediction interval:
+```{r}
+
+predict(lm.fit, data.frame(Ws_avg = 12), interval = "prediction", level = 0.95)
+
+```
+The 95% prediction interval shows that fitted value is 974 and lower interval is 689 and upper interval is 1258.
+The prediction interval is wider than the confidence interval as we would expect.
+
+```{r}
+#prediction test data
+pred1 <- predict(lm.fit, newdata = turbine.test)
+rmse <- sqrt(sum((pred1 - turbine.test$P_avg)^2)/length(turbine.test$P_avg))
+c(RMSE = rmse, R2=cor(pred1, turbine.test$P_avg) ^ 2)
+```
+Test rmse is 142 and R2 value is 0.6844 (68%). Test RMSE explains on an average how much of the predicted value will be off from the actual value. Based on test RMSE=142, we can conclude that on an average predicted value will be off by 142 from the actual value, if we just use single predictor (only wind speed and when model is linear)
+
+
+#plot response (P_avg) vs Predictor (Ws_avg)
+```{r}
+theme_set(theme_light())
+
+ggplot(turbine.train, aes(x = Ws_avg, y = P_avg)) + 
+  geom_point() + 
+  geom_abline(intercept = coef(lm.fit)[1], slope = coef(lm.fit)[2], 
+              col = "deepskyblue3", 
+              size = 1) + 
+  geom_smooth(se = F)
+```
+Deepblue line indicates the actual output line and skyblue line indicates the predicted line by using single predictor (Ws_avg)
+
+# Multiple liear regression on the turbine data set.
+
+If we want to know the effect of other variables from the dataset, then we apply multiple linar model.
+I am going to answer the follwing qeustion after runing multiple linear model. 
+
+i. Is there a relationship between the predictors and the response?
+ii. Which predictors appear to have a statistically significant relationship to the response?
+```{r}
+lm.fit=lm(P_avg~.,data=turbine.train)
+summary(lm.fit)
+```
+i. The p-value is given at the bottom of the model summary (p-value: < 2.2e-16), so it’s clear that the probability of the null hypothesis being true (given our data) is practically zero.
+We reject the null hypothesis (and hence conclude that there is a relationship between the predictors and output power (P_avg).
+
+ii. Using the coefficient p-values in the model output, and p = 0.05 as my threshold for significance, all variables except Ws_max, Wa_max, Ot_min & Ot_max have a statistically significant relationship with the response.
+
+# Diagnostic plots
+Question: Do the residual plots suggest any unusually large outliers?
+```{r}
+par(mfrow=c(2,2))
+plot(lm.fit)
+```
+
+Question: Is there evidence of non-linear association between any of the predictors and the response?
+Observation from the plot
+
+Fitted vs Residual graph
+Residuals plots should be random in nature and there should not be any pattern in the graph. The average of the residual plot should be close to zero. From the above plot, we can see that the red trend line is not zero.
+
+Normal Q-Q Plot
+Q-Q plot shows whether the residuals are normally distributed. Ideally, the plot should be on the dotted line. If the Q-Q plot is not on the line then models need to be reworked to make the residual normal. In the above plot, we see that most of the plots are on the line except at towards the end.
+
+Scale-Location
+This shows how the residuals are spread and whether the residuals have an equal variance or not.
+
+Residuals vs Leverage
+The plot helps to find influential observations. Here we need to check for points that are outside the dashed line. A point outside the dashed line will be influential point and removal of that will affect the regression coefficients.
+
+Overall, some pattern in the residuals might suggest some non-linearity in the relationships between the predictors and response that the model is not currently capturing. In nonlinear model, analysis, it will be more confirmed.
+
+
+# after removing the less significant (p> 0.05), we check the model again
+
+```{r}
+# remove the less significant feature from the model based on p value
+lm.fit2 = update(lm.fit, ~.-Ws_max-Wa_max-Ot_min-Ot_max-Ot_avg) 
+summary(lm.fit2) 
+```
+
+i.Is there a relationship between predictor and response variable?
+F=3593 is far greater than 1 and p-value <2.2e-16. It can be concluded that there is a relationship between predictor and response variable.
+
+Which of the variable are significant?
+Now in this model, all the predictors are significant.
+
+Is this model fit?
+R2 =0.7239 is closer to 1 and so this model is a good fit. Please note that this value has decreased a little from the first model but this should be fine as removing five predictors caused a drop from 0.7242 to 0.7239 and this is a small drop. In other words, the contribution of three predictors towards explaining the variance is an only small value(0.0003) and hence it is better to drop the predictor.
+
+```{r}
+#prediction on test data
+pred1 <- predict(lm.fit2, newdata = turbine.test)
+rmse <- sqrt(sum((pred1 - turbine.test$P_avg)^2)/length(turbine.test$P_avg))
+c(RMSE = rmse, R2=cor(pred1, turbine.test$P_avg) ^ 2)
+```
+
+The test RMSE is 134 and R^2 value is 0.72. Test RMSE explains on an average how much of the predicted value will be off from the actual value. Based on RMSE=134, we can conclude that on an average predicted value will be off by 134 from the actual value.
+
+```{r}
+plot(turbine.test$P_avg, pred1)
+```
+
+The graphs shows the predicted value with actual value's relationship.
+
+#Interaction Terms
+Question: Do any interactions appear to be statistically significant?
+
+```{r}
+summary(lm(formula = P_avg ~ . * .-Ws_max-Wa_max-Ot_min-Ot_max-Ot_avg, data = turbine.train))
+```
+
+We can see the significant terms (at the 0.05 level) are those with at least one asterisk (*).
+Using the standard threshold of 0.05, the significant interaction terms are given by:
+*Ws_avg:Ws_min
+*Ws_avg:Ws_max
+*Ws_avg:Ws_std
+*Ws_avg:Wa_max
+*Ws_min:Ws_max
+*Ws_min:Ws_std
+*Ws_min:Wa_avg
+*Ws_min:Wa_min 
+* Ws_max:Ws_std  
+* Ws_max:Wa_avg 
+* Ws_std:Wa_min 
+* Ws_std:Wa_max 
+* Ot_max:Ot_std 
+the above variable have interaction effect.As we’d expect, RSE decreases considerably & R2/adjusted R2 increases considerably after adding the interaction terms to the model. New RSE is 49.36 and r-squared value is 0.964
+
+# Resampling Methods
+Resmapling methods do with repeatedly drawing samples from a training set and refitting the model of interest on each sample in order to obtain additional information about the fitted model.
+
+# Validation set approach
+
+We carry out the Validation set approach on the our dataset. We use the set.seed() to random generate sample. We will randomly divide the observations into 6000 train and 6000 validation set.
+
+Question: Using the validation set approach, can we reduce the test error of this model. 
+
+Split the sample set into a training set and a validation set.
+
+
+```{r}
+#The Validation Set Approach
+#random split into train and test
+set.seed(1)
+# 50%-%50% split for training and testing (training data half of the data)
+train=sample(12000,6000)
+lm.fit=lm(P_avg~Ws_avg+Ws_min+Ws_std+Wa_avg+Wa_min+Wa_std+Ot_std,data=turbine,subset=train)
+summary(lm.fit)
+```
+We run the predict() function using fit model and observe the validation set error rate.
+```{r}
+#compute MSE on testing data
+mean((P_avg-predict(lm.fit,turbine))[-train]^2)
+#TEST RMSE
+sqrt(mean((P_avg-predict(lm.fit,turbine))[-train]^2))
+```
+
+using validation set approach, we have found Test RMSE is 135
+
+# LOOCV method
+Leave-one-out cross validation (LOOCV). We use the cv.glm() function in boot library in R to carry out Leave-One-Out Cross-Validation.
+```{r}
+library(boot)
+# glm- generalize linear modle
+glm.fit=glm(P_avg~Ws_avg+Ws_min+Ws_std+Wa_avg+Wa_min+Wa_std+Ot_std,data=turbine) 
+
+# The LOOCV estimate using the cv.glm() function
+cv.err=cv.glm(turbine,glm.fit)
+cv.err$delta 
+#TEST RMSE using LOOCV method
+sqrt(cv.err$delta)
+```
+using LOOCV, we have found Test RMSE is 136, MSE is 18501
+
+
+# k-fold cross validation (k=5, k=10)
+For K-Fold Cross-Validation, we use cv.glm() function to implement k-fold CV. We set K = 5 first and also use k=10.For both procedure, we get CV errors corresponding to polynomial fits for orders 1 to 5.
+
+
+```{r}
+# 5-Fold Cross-Validation
+set.seed(17) 
+cv.error=rep(0,5) 
+for (i in 1:5){
+  glm.fit=glm(P_avg~poly(Ws_avg,i),data=turbine)
+  cv.error[i]=cv.glm(turbine,glm.fit)$delta[1]
+}
+cv.error
+degree=1:5
+```
+plot using k=5 fold cross validation
+```{r}
+plot(degree,cv.error, type="l")
+```
+
+Now compute K=10 fold cross validation
+```{r}
+
+# 10-Fold Cross-Validation
+
+set.seed(17) 
+cv.error.10=rep(0,10) # 10 cross validation
+for (i in 1:10){
+  glm.fit=glm(P_avg~poly(Ws_avg,i),data=turbine)
+  cv.error.10[i]=cv.glm(turbine,glm.fit,K=10)$delta[1]
+}
+cv.error.10
+degree=1:10
+```
+
+using cross validation error, The lowest MSE is 2250 when k=7
+```{r}
+plot(degree,cv.error.10, type="l")
+```
+Graph explains the cross validation error and lowest MSE occured when k=7
+
+#model with k fold cross validation
+```{r}
+#model train using k fold cross validation
+library(caret)
+set.seed(1)
+ctrl <- trainControl(
+  method = "cv",
+  number = 10, 
+)
+
+model1 <- train(
+  P_avg ~ .,
+  data = turbine.train,
+  method = 'lm',
+  trControl = ctrl
+)
+(model1)
+```
+linear model train with 10 fold crosss validation
+
+```{r}
+#prediction
+pred1 <- predict(model1, newdata = turbine.test)
+rmse <- sqrt(sum((pred1 - turbine.test$P_avg)^2)/length(turbine.test$P_avg))
+c(RMSE = rmse, R2=cor(pred1, turbine.test$P_avg) ^ 2)
+```
+
+Prediction resul shows that test RMSE is 140.59 with R^2 value is 0.72
+
+# Subset selection and Regularization
+Best subset selection
+
+We apply the best subset selection approach on our data set. Although there are other packages to do this but We use the bestglm package in R package to carryout subset selection. The leaps package is used for linear regression .
+```{r}
+#best subset selection_method
+library(leaps)
+best_subset=regsubsets(P_avg~.,data=turbine,nvmax=12)
+best.summary=summary(best_subset)
+best.summary
+```
+Asterish indicates that a given variable is included in the corresponding model. From above, the output indicated that the best one-variable model contains Ws_max(maximum wind speed). Best two-variable model contains only Ws_avg and Ws_std, best three-variable model contains Ws_avg,Ws_std and Wa_std etc.
+Question: which variable is less significant for best subset method?
+variable Ot_max (maximum outdoor temperature) is less significant for best subset method.
+
+```{r}
+names(best.summary)
+```
+The summary() function returns R2, RSS, adjusted R2, Cp, and BIC. We can examine these to try to select the best overall model.
+
+```{r}
+
+plot(best.summary$rss,xlab="Number of Variables",ylab="RSS",type="l")
+```
+
+From the Residual Sum of Squares (RSS) plot, we see as the number of variable increses, the RSS decreses.
+```{r}
+plot(best.summary$adjr2,xlab="Number of Variables",ylab="Adjusted RSq",type="l")
+which.max(best.summary$adjr2)
+points(11,best.summary$adjr2[11], col="red",pch=20)
+```
+Using Adjusted R2, the best-subset algorithm selects the 11-variable model
+```{r}
+plot(best.summary$cp,xlab="Number of Variables",ylab="Cp",type='l')
+which.min(best.summary$cp)
+points(11,best.summary$cp[11],col="red",pch=20)
+```
+Using Cp, the best-subset algorithm selects the 11-variable model
+
+```{r}
+plot(best.summary$bic,xlab="Number of Variables",ylab="BIC",type='l')
+which.min(best.summary$bic)
+points(7,best.summary$bic[7],col="red",pch=20)
+```
+
+Using BIC, the best-subset algorithm selects the 7-variable model, with the following coefficients:
+```{r}
+# coefficients
+coef(best_subset,7)
+```
+
+The best subset algorithm choose the (Ws_avg, Ws_min,Ws_std, Wa_avg, Wa_min, Wa_std, Ot_std) variables.
+
+#Stepwise Selection
+Forward stepwise selectiion
+The regsubsets() function will be used for forward stepwise selection, by adding the parameter method=“forward”.
+```{r}
+# Forward subset selection method
+subset.fwd=regsubsets(P_avg~.,data=turbine,nvmax=12,method="forward")
+summary(subset.fwd)
+```
+Following the above forward stepwise selection, the best one variable model contains only Ws_max, and the best two-variable contains Ws_max and Wa_std and so on.
+Backward subset method:The regsubsets() function can also be used for backward stepwise selection, by adding the parameter method=“backward”.
+```{r}
+#Backward subset selection method
+subset.bwd=regsubsets(P_avg~.,data=turbine,nvmax=12,method="backward")
+summary(subset.bwd)
+```
+The result i obtained is not similar to forward stepwise. In backward stepwise method, the best one variable model contains only Ws_avg, and the best two-variable contains Ws_avg and Ws_std and so on.
+
+Now best seven-variable models identified by forward, backwar and best subset methods:
+```{r}
+coef(best_subset,7) # 7 features obtained using best subset
+coef(subset.fwd,7) # 7 features obtained using forward subset method
+coef(subset.bwd,7) # 7 features obtained using backward subset method
+```
+
+Features identified by the above three approach are different. Features selected by best subset and backward subset method almost similar except Ot_std, Ot_avg, but in forward methods, obtained features are totally different from others.
+
+I will test this by fitting a Linear regression model with only these seven variables and checking the performance of this model.
+```{r}
+#linear model with best  7 features
+subset_fit=lm(P_avg~Ws_avg+Ws_min+Ws_std+Wa_avg+Wa_min+Wa_std+Ot_std,data=turbine.train)
+summary(subset_fit)
+```
+
+from the summary table, we see all variables are statistically significant. RSE value is 136 
+```{r}
+#prediction on test data 
+
+pred1 <- predict(subset_fit, newdata = turbine.test)
+rmse <- sqrt(sum((pred1 - turbine.test$P_avg)^2)/length(turbine.test$P_avg))
+c(RMSE = rmse, R2=cor(pred1, turbine.test$P_avg) ^ 2)
+```
+Test RMSE is 134 and R2 value is 71%
+
+#Shrinkage Methods
+For shrinkage methods we carry out two approaches. Namely, regression model and lasso models. We use glmnet R package to perform both ridge regression model and lasso models.
+
+#Ridge regression
+We use the glmnet() function in R with parameter alpha=0 to fit a ridge regression model. We make use of other R functions to prepare the data for ridge regression.
+```{r}
+library(ISLR)
+library(glmnet)
+```
+
+```{r}
+x=model.matrix(P_avg~.-1,data=turbine.train)
+y=turbine.train$P_avg
+#for test data
+x_test=model.matrix(P_avg~.-1,data=turbine.test)
+y_test=turbine.test$P_avg
+#alpha=0 for Ridge regression 
+grid =10^ seq (10 , -2 , length =100)
+fit.ridge=glmnet(x,y,alpha=0, lambda = grid)
+summary(fit.ridge)
+plot(fit.ridge, xvar="lambda", label=TRUE)
+```
+here, i fit a ridge regression model on the trainin set. from the graph , we see that coeffiect value is differnt for the different log lamda.
+
+
+```{r}
+#use cross validation to choose the tuning parameter lambda
+cv.out = cv.glmnet(x,y,alpha =0)
+plot(cv.out)
+```
+Ridge regression - lambda selection (using cross validation).Here i have chosen to implement the function over a grid of values ranging from lamda = 0.01 to lamda = 100, esentially covering the full range of scenarios from the null model containing only the intercept, to the least squares fit
+
+```{r}
+bestlam = cv.out$lambda.min
+bestlam
+```
+The selected value of λ is 21.82054. I re-fit the model and produce predictions for this value of lambda on the test data. This gives the resulting test MSE:
+```{r}
+#fit again using bestlambda
+fit.ridge=glmnet(x,y,alpha=0, lambda = bestlam)
+# prediction on test data
+ridge.pred = predict (fit.ridge , s = bestlam , newx = x_test)
+# test RMSE
+sqrt(mean (( ridge.pred - y_test ) ^2))
+# test R2
+cor(ridge.pred, y_test) ^ 2
+```
+Here the test RMSE is 133 and R2 value is 72%
+
+# Lasso regression
+Lasso works similar to ridge regression with the difference that lasso has penalty of the sum of the absolute values of the coefficients. The penalty for ridge regression is the sum of the squares of the cofficients. I will use glmnet also for lasso but with alpha parameter set to 1.
+
+```{r}
+x=model.matrix(P_avg~.-1,data=turbine.train)
+y=turbine.train$P_avg
+#for test data
+x_test=model.matrix(P_avg~.-1,data=turbine.test)
+y_test=turbine.test$P_avg
+#alpha=1 for Lasso regression 
+grid =10^ seq (10 , -2 , length =100)
+fit.lasso=glmnet(x,y,alpha=1, lambda = grid)
+summary(fit.lasso)
+plot(fit.lasso, xvar="lambda", label=TRUE)
+```
+here, i fit a lasso regression model on the trainin set. from the graph , we see that coeffiect value is differnt for the different log lamda and also different from ridge regression.
+
+```{r}
+#use cross validation to choose the tuning parameter lambda
+cv.out = cv.glmnet(x,y,alpha =1)
+plot(cv.out)
+```
+I test varying values of λ (from 0.01 to 100) using cross-validation. The above plot displays the cross-validation error according to the log of lambda. The vertical dash line indictaes that the log of the optimal value of lambda is approximately 1.8, which minimizes the prediction error. This lamdba value will give the most accuract model.
+```{r}
+bestlam = cv.out$lambda.min
+bestlam
+```
+The selected value of λ is 0.467449.Fitting the full model, and evaluating the test RMSE:
+```{r}
+#fit again using bestlambda
+fit.lasso=glmnet(x,y,alpha=1, lambda = bestlam)
+# prediction on test data
+lasso.pred = predict (fit.lasso , s = bestlam , newx = x_test)
+# test RMSE
+sqrt(mean (( lasso.pred - y_test ) ^2))
+# test R2
+cor(lasso.pred, y_test) ^ 2
+```
+The test rmse for lasso is 140 that is greater than ridgre regression model.
+
+# Dimension Reduction Methods
+There are two dimension reduction methods we carry out in this session. These are methods are principal components regression and partial least squares method.
+
+#Principal Components Regression (PCR)
+Principal components regression (PCT) can be performed using the pcr() function in R.
+
+```{r}
+# Principal Components Regression
+library(pls)
+set.seed(2)
+pcr.fit=pcr(P_avg~., data=turbine.train,scale=TRUE,validation="CV")
+summary(pcr.fit)
+```
+Before doing PCR, Data need to be scaled, by scale = True, i scaled the data.The summary call displays the  PCR component coficient and percentage of variance explained by the components.If i select 7 components , that will be expained arroun 95.57% variance of the data. For M =1 only captures 29.36% of all variance or information in the predictors. In contrast, using M=7 increases the value to 95.57%
+
+```{r}
+# PCR -M selection using cross validation 
+validationplot(pcr.fit,val.type="MSEP")
+```
+Cross-validation selected M= 12 (so we can note that M=p=12) - the dimensionality hasn’t been reduced at all. Because the lowest cross-validation error occurs when M=12 (135.4)
+But If I select M=7 that will explained 95% variance of the data. Now fit model with M=7 and evaluate the test MSE
+
+```{r}
+# fit model using 7 PCA that explained 95% variance of the data
+pcr7.fit = pcr (P_avg~., data=turbine.train,scale = TRUE ,ncomp =7)
+# Prediction test data
+#remove the target variable from turbine test set
+test.features = subset(turbine.test, select=-c(P_avg))
+#ground truth value
+test.target = subset(turbine.test, select=P_avg)[,1]
+#prediction
+pcr.pred = predict( pcr7.fit , test.features , ncomp =7)
+# TEST RMSE
+sqrt(mean((test.target - pcr.pred)^2))
+# Test R2
+cor(test.target, pcr.pred) ^ 2
+```
+
+So using PCR test RMSE is 138 and R2 value is 72%
+
+#Partial Least Squares(PLS regression)
+
+I implement PLS using plsr() function in the R. 
+
+```{r}
+pls.fit=plsr(P_avg~., data=turbine.train,scale=TRUE,validation="CV")
+summary(pls.fit)
+```
+
+Before doing PLS, Data need to be scaled, by scale = True, i scaled the data.The summary call displays the  PCR component coficient and percentage of variance explained by the components.If i select 7 components , that will be expained arroun 84.74% variance of the data that is less than PCR component explained. For M =1 only captures 28.19% of all variance or information in the predictors. In contrast, using M=9 increases the value to 99.78%
+
+```{r}
+validationplot(pls.fit,val.type="MSEP")
+```
+Cross-validation selected M= 12 (so we can note that M=p=12) - the dimensionality hasn’t been reduced at all. Because the lowest cross-validation error occurs when M=12 (136.5)
+But If I select M=7 that will explained 84% variance of the data but i will compare the test RMSE with PCR test rmse. Now fit model with M=7 and evaluate the test RMSE.
+
+```{r}
+# fit model using 7 PLS that explained 84% variance of the data
+pls7.fit = plsr (P_avg~., data=turbine.train,scale = TRUE ,ncomp =7)
+# Prediction test data
+#remove the target variable from turbine test set
+test.features = subset(turbine.test,scale = TRUE, select=-c(P_avg))
+#ground truth value
+test.target = subset(turbine.test,scale = TRUE, select=P_avg)[,1]
+#prediction
+pls.pred = predict( pls7.fit , test.features ,scale = TRUE, ncomp =7)
+# TEST RMSE
+sqrt(mean((test.target - pls.pred)^2))
+# Test R2
+cor(test.target, pls.pred) ^ 2
+```
+
+So using PLS, The test RMSE with M=7 component is 133.86 that is less than PCR test RMSE 138 
+
+
+#Moving Beyond Linearity
+
+#polynomial regression
+```{r}
+# correlation check
+cor(turbine)
+
+```
+#wind speed with target variable (power) has highest correlation and it's 0.82, so here as polynomial, take wind speed as a feature variable
+
+```{r}
+# polynomial regression
+model_poly = lm(P_avg ~ poly(Ws_avg, 5), data = turbine.train)
+summary(model_poly)
+```
+From the summary table, we see polynomial regression with degree 3 is not statistically significant. Deciding  a degree. We can use hypothesis tests(e.g. ANOVA) to test nested sequence of models.
+```{r}
+poly_1 = lm(P_avg~Ws_avg, data = turbine.train)
+poly_2 = lm(P_avg~poly(Ws_avg,2), data = turbine.train)
+poly_3 = lm(P_avg~poly(Ws_avg,3), data = turbine.train)
+poly_4 = lm(P_avg~poly(Ws_avg,4), data = turbine.train)
+poly_5 = lm(P_avg~poly(Ws_avg,5), data = turbine.train)
+print(anova(poly_1,poly_2,poly_3,poly_4,poly_5))
+```
+Model 2 is statiscially signifcant than model 3 with degree of 3. But For higher degree like (degree, 4,5), both model is also significant. I will take model 2 with degree 2 as the model with higher polynomial degree is more difficult to explain.
+```{r}
+# fit a polynomial directly using degree 4 that selected by ANOVA
+model_poly_fit=lm(P_avg~I(Ws_avg^4), data=turbine.train)
+
+#prediction on test data
+pred1 <- predict(model_poly_fit, newdata = turbine.test)
+rmse <- sqrt(sum((pred1 - turbine.test$P_avg)^2)/length(turbine.test$P_avg))
+c(RMSE = rmse, R2=cor(pred1, turbine.test$P_avg) ^ 2)
+```
+The model 4 Test RMSE is 94, now see the test RMSE for taking the model 2
+```{r}
+# fit a polynomial directly using degree 2 that selected by ANOVA
+model_poly_fit=lm(P_avg~I(Ws_avg^2), data=turbine.train)
+
+#prediction on test data
+pred1 <- predict(model_poly_fit, newdata = turbine.test)
+rmse <- sqrt(sum((pred1 - turbine.test$P_avg)^2)/length(turbine.test$P_avg))
+c(RMSE = rmse, R2=cor(pred1, turbine.test$P_avg) ^ 2)
+```
+Here, i see model 2 Test RMSE (79.22) which is less than test RMSE of model 4(94.02). It means if i take model4, it will overfit the data as a result we will get the high variance result on test data.
+
+#Spline with Knots
+```{r}
+library(splines)
+library(tidyverse)
+```
+# Build spline model using knots
+```{r}
+knots <- quantile(turbine.train$Ws_avg, p = c(0.25, 0.5, 0.75))
+model <- lm (P_avg ~ bs(Ws_avg, knots = knots), data = turbine.train)
+summary(model)
+```
+From the summary , all knots are not significant, but overall RSE is decresead than any other model. 
+```{r}
+#plot 
+ggplot(turbine.train, aes(Ws_avg, P_avg) ) +
+  geom_point() +
+  stat_smooth(method = lm, formula = y ~ splines::bs(x, df = 2))
+```
+The plot shows the predicted result with spline using knots
+```{r}
+#prediction on test data
+pred1 <- predict(model, newdata = turbine.test)
+rmse <- sqrt(sum((pred1 - turbine.test$P_avg)^2)/length(turbine.test$P_avg))
+c(RMSE = rmse, R2=cor(pred1, turbine.test$P_avg) ^ 2)
+```
+
+
+test RMSE is 51 for spline with knots
+
+#Smoothing spline
+```{r}
+model_spline = smooth.spline(y = turbine.train$P_avg,
+                             x = turbine.train$Ws_avg,
+                             lambda = 0.01) 
+model_spline
+#model2, different lamda
+mod_ss2 = smooth.spline(y = turbine.train$P_avg,
+                        x = turbine.train$Ws_avg,
+                        lambda = 1) 
+mod_ss2
+```
+Two smothing spline model with lambda = 0.001, and lambda=1.  But effective degree of freedom for model1 is 10.9044 that is higher the model 2 where value is 4.062176. Effective degree of freedom determines the smoothing of wiggle. The higher the effective degree of freedom the more the curve is wiggly in nature. Now select tuning parameter using cross validation method.
+
+```{r}
+#cross-validation to select the best lamda for model flexibility.
+mod_ss3 = smooth.spline(y = turbine.train$P_avg,
+                        x = turbine.train$Ws_avg,
+                        cv = T) 
+mod_ss3
+mod_ss3$lambda
+```
+Here the value of tunning parameter lambda is 0.01952641 where effective degree of freedom is 9.3686. Now plot the three model.
+```{r}
+# plot 3 fitted model
+
+turbine.train %>% 
+  mutate(pred1 = fitted(model_spline),
+         pred2 = fitted(mod_ss2),
+         pred3 = fitted(mod_ss3)) %>% 
+  ggplot(aes(Ws_avg, P_avg)) +
+  geom_point() +
+  geom_line(aes(y=pred1),col="yellow",lwd=1.2) +
+  geom_line(aes(y=pred2),col="red",lwd=1.2) +
+  geom_line(aes(y=pred3),col="darkgreen",lwd=1.2)  
+```
+darkgreen indicates the model 3 with tuning parameter lamda = 0.01952641. Now see on the test data
+
+```{r}
+#prediction on test data for best fiited mod_ss3
+ss_pred = predict(mod_ss3, turbine.test$Ws_avg)
+# Model performance
+ss_perf = data.frame(
+  RMSE = sqrt(sum((ss_pred$y- turbine.test$P_avg)^2)/length(turbine.test$P_avg)),
+  COR = cor(ss_pred$y, turbine.test$P_avg)
+)
+ss_perf 
+```
+
+The test RMSE for smoothing spline is 51.299 which is similar for spline with knots but R2 value is different.
+
+#local regression
+```{r}
+#loess: local regression, span controls the degree of smoothing
+mod_loess = loess(P_avg ~ Ws_avg,span = 0.2,degree = 1,data = turbine.train)
+summary(mod_loess)
+```
+
+here span is ised for local regression s =0.2 and for training data residual standard error is 46.82
+```{r}
+#plot
+turbine.train %>% 
+  mutate(pred = mod_loess$fitted) %>% 
+  ggplot(aes(Ws_avg, P_avg)) +
+  geom_point() +
+  geom_line(aes(Ws_avg,pred), col="red", lwd=1.5) 
+```
+
+The graphs shows the how train data is fitted with local non linear regression model. Now test the model on test data.
+```{r}
+#prediction on test data
+pred1 <- predict(mod_loess, newdata = turbine.test)
+rmse <- sqrt(sum((pred1 - turbine.test$P_avg)^2)/length(turbine.test$P_avg))
+c(RMSE = rmse, R2=cor(pred1, turbine.test$P_avg) ^ 2)
+```
+The test RMSE for Local regression is 49.73487
+
+# Generalized Additive Models
+Generalized additive models (GAMs) presents framwork to extending a standard linear model by allowing non-linear functions of each variables while maintaining additivity.
+
+We use the gam() function in the gam package in R.  One important feature of gam is its ability to allow non-linearity on multiple variables at the sametime. GAM can be used with other non-linear functions.We run gam function on our turbine data set. The We fit the model using smoothing splines.
+
+```{r}
+# library gam package
+library(gam)
+```
+First i fit the model using smoothing splines and predic on test data. Then i fit the model using natural spline and predic on test data.
+
+```{r}
+#smoothing spline fit with GAM
+turbine.gam <- gam(P_avg ~ s(Ws_avg) + s(Ws_max) + s(Ws_min) + s(Ws_std) + s(Wa_avg) +
+                     s(Wa_max) + s(Wa_std) + s(Wa_min) + s(Ot_avg) + s(Ot_max) + s(Ot_min) + s(Ot_std), data = turbine.train)
+summary(turbine.gam)
+```
+summary indicates the significant value, all are not statistically significant.
+```{r}
+#plot
+plot(turbine.gam, shade = TRUE, seWithMean = TRUE, scale = 0)
+```
+From the plots above, can see that fitting non-linearity on most of the variables is sufficient, but Non-linearity isn’t sufficint for all variables.
+```{r}
+#prediction
+pred1 <- predict(turbine.gam, newdata = turbine.test)
+rmse <- sqrt(sum((pred1 - turbine.test$P_avg)^2)/length(turbine.test$P_avg))
+c(RMSE = rmse, R2=cor(pred1, turbine.test$P_avg) ^ 2)
+```
+test rmse for gam model using smoothing spline is 46.12
+
+# gam model using natural spline
+```{r}
+#natural spline
+turbine.gam <- lm(P_avg ~ ns(Ws_avg,df=2) + ns(Ws_max,df=2) + ns(Ws_min,df=2) + ns(Ws_std,df=2) + ns(Wa_avg,df=2) +ns(Wa_max,df=2) + ns(Wa_std,df=2) + ns(Wa_min, df=2) + 
+                     ns(Ot_avg, df=2) + ns(Ot_max,df=2) + ns(Ot_min,df=2) + ns(Ot_std,df=2), data = turbine.train)
+summary(turbine.gam)
+```
+
+here RSE is not reduced than before
+```{r}
+#plot
+plot(turbine.gam, se = TRUE)
+```
+
+plot showes the natureal spline fitted model. now test the model on test data.
+```{r}
+#prediction
+pred1 <- predict(turbine.gam, newdata = turbine.test)
+rmse <- sqrt(sum((pred1 - turbine.test$P_avg)^2)/length(turbine.test$P_avg))
+c(RMSE = rmse, R2=cor(pred1, turbine.test$P_avg) ^ 2)
+```
+
+here test rmse not reduced
+
+# Treee based model
+
+```{r}
+## Fitting Regression Trees
+library(tree)
+tree.turbine <- tree(P_avg ~ ., data = turbine.train)
+summary(tree.turbine)
+```
+tree with 7 nodes
+```{r}
+plot(tree.turbine)
+text(tree.turbine, pretty = 0)
+cv.turbine <- cv.tree(tree.turbine)
+plot(cv.turbine$size, cv.turbine$dev, type = "b")
+```
+trees terminal select using cross validation
+```{r}
+#pruning the tree
+prune.turbine <- prune.tree(tree.turbine, best = 6)
+plot(prune.turbine)
+text(prune.turbine, pretty = 0)
+```
+tree pruning with 6 terminal nodes
+```{r}
+#prediction
+pred1 <- predict(tree.turbine, newdata = turbine.test)
+rmse <- sqrt(sum((pred1 - turbine.test$P_avg)^2)/length(turbine.test$P_avg))
+c(RMSE = rmse, R2=cor(pred1, turbine.test$P_avg) ^ 2)
+
+```
+
+tree rmse is 67
+
+```{r}
+## Bagging and Random Forests
+
+library(randomForest)
+set.seed(1)
+bag.turbine <- randomForest(P_avg ~ ., data = turbine.train, mtry = 12, importance = TRUE)
+bag.turbine
+```
+
+load the random
+```{r}
+#prediction
+pred1 <- predict(bag.turbine, newdata = turbine.test)
+rmse <- sqrt(sum((pred1 - turbine.test$P_avg)^2)/length(turbine.test$P_avg))
+c(RMSE = rmse, R2=cor(pred1, turbine.test$P_avg) ^ 2)
+plot(pred1, turbine.test$P_avg)
+```
+
+predicted model
+```{r}
+### bagging another model, change number of tree
+bag.turbine <- randomForest(P_avg ~ ., data = turbine.train, mtry = 12, ntree = 25)
+#prediction
+pred1 <- predict(bag.turbine, newdata = turbine.test)
+rmse <- sqrt(sum((pred1 - turbine.test$P_avg)^2)/length(turbine.test$P_avg))
+c(RMSE = rmse, R2=cor(pred1, turbine.test$P_avg) ^ 2)
+```
+the model is the lowest RMSE so far now- 32
+```{r}
+### random forest reducing number of variables(mtry=6)
+set.seed(1)
+rf.turbine <- randomForest(P_avg ~ ., data = turbine.train, mtry = 6, importance = TRUE)
+#prediction
+pred1 <- predict(rf.turbine, newdata = turbine.test)
+rmse <- sqrt(sum((pred1 - turbine.test$P_avg)^2)/length(turbine.test$P_avg))
+c(RMSE = rmse, R2=cor(pred1, turbine.test$P_avg) ^ 2)
+```
+
+RMSE even lower and R2 also incrses than before. This is the result from random forest
+
+```{r}
+## Boosting
+library(gbm)
+set.seed(1)
+boost.turbine <- gbm(P_avg ~ ., data = turbine.train,distribution = "gaussian", n.trees = 5000,interaction.depth = 4)
+summary(boost.turbine)
+```
+the most important variavle is ws average
+
+```{r}
+###plot
+plot(boost.turbine, i = "Ws_avg")
+plot(boost.turbine, i = "Ot_avg")
+```
+
+now the prediction
+```{r}
+#prediction
+pred1 <- predict(boost.turbine, newdata = turbine.test, n.trees = 5000)
+rmse <- sqrt(sum((pred1 - turbine.test$P_avg)^2)/length(turbine.test$P_avg))
+c(RMSE = rmse, R2=cor(pred1, turbine.test$P_avg) ^ 2)
+
+```
+
+boosting shows also lower rmse
+another boosting model
+
+```{r}
+### boosting another model
+boost.turbine <- gbm(P_avg ~ ., data = turbine.train,distribution = "gaussian", n.trees = 5000,interaction.depth = 4, shrinkage = 0.2, verbose = F)
+summary(boost.turbine)
+```
+
+here will se the prediction result
+
+```{r}
+#prediction
+pred1 <- predict(boost.turbine, newdata = turbine.test, n.trees = 5000)
+rmse <- sqrt(sum((pred1 - turbine.test$P_avg)^2)/length(turbine.test$P_avg))
+c(RMSE = rmse, R2=cor(pred1, turbine.test$P_avg) ^ 2)
+
+```
+also lowest the RMSE value now.
+
+# SVM regression
+support vector regression. for non linear relation ship, i will use kernel function
+
+```{r}
+#support vector regressor
+set.seed(1)
+library(caret)
+library(kernlab)
+set.seed(1)
+model3 <- train(P_avg ~ .,data = turbine.train,method = 'svmRadial')
+model3
+```
+support vector use sigma tuning parameter.
+```{r}
+#prediction
+pred1 <- predict(model3, newdata = turbine.test)
+rmse <- sqrt(sum((pred1 - turbine.test$P_avg)^2)/length(turbine.test$P_avg))
+c(RMSE = rmse, R2=cor(pred1, turbine.test$P_avg) ^ 2)
+
+```
+
+prediction rmse is 41. for sigma =0.086 and constant c=1
+another model
+```{r}
+# model training using cross validation, 10 cross validation
+ctrl <- trainControl(method = "cv",number = 10)
+model4 <- train(P_avg ~ .,data = turbine.train,method = 'svmRadial', trCtrl = ctrl)
+model4
+```
+
+here radial basis function is used, for different value of c , the RMSE is minimum when c=1
+
+```{r}
+#prediction
+pred1 <- predict(model4, newdata = turbine.test)
+rmse <- sqrt(sum((pred1 - turbine.test$P_avg)^2)/length(turbine.test$P_avg))
+c(RMSE = rmse, R2=cor(pred1, turbine.test$P_avg) ^ 2)
+```
+here prediction ruslt on test rmse is not changed
+another model svm
+
+```{r}
+# model training using tuning hyper parameter
+tuneGrid <- expand.grid(C = c(0.25, .5, 1),sigma = 0.1)
+model5 <- train(P_avg ~ .,data = turbine.train, method = 'svmRadial',trControl = ctrl,tuneGrid = tuneGrid)
+model5
+```
+sigmal value is changed than before
+```{r}
+#prediction
+pred1 <- predict(model5, newdata = turbine.test)
+rmse <- sqrt(sum((pred1 - turbine.test$P_avg)^2)/length(turbine.test$P_avg))
+c(RMSE = rmse, R2=cor(pred1, turbine.test$P_avg) ^ 2)
+plot(pred1, turbine.test$P_avg)
+
+```
+now rmse for test data has been improved, now 40
+
+#KNN regression
+```{r}
+library(caret)
+set.seed(1)
+modelknn <- train(P_avg ~ .,data = turbine.train, method = 'knn')
+modelknn
+```
+here rmse is selec from lower rmse, k=7
+```{r}
+plot(modelknn)
+```
+plot shows the select of k value
+```{r}
+#prediction
+pred1 <- predict(modelknn, newdata = turbine.test)
+rmse <- sqrt(sum((pred1 - turbine.test$P_avg)^2)/length(turbine.test$P_avg))
+c(RMSE = rmse, R2=cor(pred1, turbine.test$P_avg) ^ 2)
+```
+test rmse is 132 that is lower
+```{r}
+# model training using cross validation, 10 cross validation
+ctrl <- trainControl(method = "cv",number = 10)
+model4 <- train(P_avg ~ .,data = turbine.train,method = 'knn', trCtrl = ctrl)
+model4
+```
+rmse not improved
+```{r}
+#prediction
+pred1 <- predict(model4, newdata = turbine.test)
+rmse <- sqrt(sum((pred1 - turbine.test$P_avg)^2)/length(turbine.test$P_avg))
+c(RMSE = rmse, R2=cor(pred1, turbine.test$P_avg) ^ 2)
+```
+prediction on test data is decresed now 132
+another knn model by hyperparameter tunning
+```{r}
+# model training using tuinng hyperparameter
+tuneGrid <- expand.grid(k = seq(2, 9, by = 1))
+model5 <- train(P_avg ~ .,data = turbine.train, method = 'knn',trControl = ctrl,tuneGrid = tuneGrid)
+model5
+```
+here k is selected 130  for k =4
+
+```{r}
+#prediction
+pred1 <- predict(model5, newdata = turbine.test)
+rmse <- sqrt(sum((pred1 - turbine.test$P_avg)^2)/length(turbine.test$P_avg))
+c(RMSE = rmse, R2=cor(pred1, turbine.test$P_avg) ^ 2)
+```
+yes , test RMSE also lower than before.
+
+
